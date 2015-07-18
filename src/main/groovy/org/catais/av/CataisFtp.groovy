@@ -30,18 +30,19 @@ class CataisFtp {
 					return
 				}
 				
-				println fileName
-				fileList << fileName
-				
-//				def incomingFile = new File()
-				
+				log.info "Downloading: ${fileName}"
+				def incomingFile = new File(downloadDirectory + File.separator + fileName)
+				if (!incomingFile.withOutputStream {ostream -> retrieveFile fileName, ostream}) {
+					log.error 'Error while downloading data.'
+					return
+				}
+			
+				log.debug "File downloaded: ${incomingFile.absoluteFile}"
+				fileList << incomingFile.absoluteFile
 			}
-		
+			
 			return fileList
 		}
-		
-		// We can use this list to do some QA (e.g. compare list from ftp server with list of downloaded files etc.)
-		println fileList
-		
+		return fileList		
 	}	
 }

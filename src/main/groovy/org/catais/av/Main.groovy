@@ -5,8 +5,16 @@ import groovy.util.CliBuilder
 
 @Log4j2
 class Main {
-
+	
+	//TODO: proper exception handling!!!!
+	
 	static main(args) {
+
+		// These must be configurable.
+		def importDirectory = '/tmp/'
+		//		
+		
+		def fileList
 		
 		def startTime = Calendar.instance.time
 		def startTimeMs = startTime.time
@@ -15,7 +23,7 @@ class Main {
 		def endTimeMs  
 		def elapsedTime 
 		
-		log.info "Start import at ${startTime}."
+		log.info "Start: ${startTime}."
 	
 		def cli = new CliBuilder(
 			usage: 'groovy Fubar.groovy --initdb', 
@@ -36,16 +44,22 @@ class Main {
 		}
 		
 		if (options.download) {
-			log.debug 'Download data'
+			log.info 'Download files from FTP Server.'
 			
-			def ftp = new CataisFtp()
-			ftp.downloadData()
-			
-			
+//			def ftp = new CataisFtp()
+//			ftp.downloadDirectory = importDirectory
+//			fileList = ftp.downloadData()
+		
+			log.debug "List of downloaded files: ${fileList}"
 		}
 		
 		if (options.initdb) {
-			log.debug 'Initialize database'
+			log.info 'Create database schema.'
+			
+			def pg = new PostgresqlDatabase()
+			pg.grantSelectToPublicDbusr = true
+			pg.addAdditionalAttributes = true
+			pg.createSchema()
 		}
 		
 		
@@ -57,7 +71,7 @@ class Main {
 		elapsedTime = (endTimeMs - startTimeMs)
 
 		log.info "Elapsed time: ${elapsedTime} ms"
-		log.info "Import done at ${endTime}."
+		log.info "End: ${endTime}."
 		
 		println "Stefan"
 		
