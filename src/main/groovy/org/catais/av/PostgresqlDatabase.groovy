@@ -19,8 +19,7 @@ class PostgresqlDatabase {
 	def dbschema = "av_avdool_ng"
 	def modelName = "DM01AVCH24D"
 	
-	def publicDbusr = "mspublic"
-	def grantSelectToPublicDbusr = false
+	def grantPublic = null
 	def addAdditionalAttributes = false
 	
 	def createSchema() {
@@ -42,8 +41,9 @@ class PostgresqlDatabase {
 		config.setMaxSqlNameLength("60")
 		config.setStrokeArcs("enable")
 		config.setSqlNull("enable"); // be less restrictive
+		config.setValue("ch.ehi.sqlgen.createGeomIndex", "True");
 		
-		// TODO: Geometry Index????
+		// TODO: Would it make sense to create an index on pk (t_id) and fk?
 		
 		config.setDefaultSrsAuthority("EPSG")
 		config.setDefaultSrsCode("21781")
@@ -54,23 +54,25 @@ class PostgresqlDatabase {
 		Ili2db.runSchemaImport(config, "");
 		log.info "Schema created: ${dbschema}."
 		
-		// Grant usage rights on schema an select on all tables in this schema
+		// Grant usage rights on schema and select on all tables in this schema
 		// to a read only user (which must exist in the database).
-		if (grantSelectToPublicDbusr) {
+		if (grantPublic) {
 			def sql = Sql.newInstance(dburl)
 			sql.connection.autoCommit = false
 			
 			try {
-				def query = "GRANT USAGE ON SCHEMA ${Sql.expand(dbschema)} TO ${Sql.expand(publicDbusr)};" +
-							"GRANT SELECT ON ALL TABLES IN SCHEMA ${Sql.expand(dbschema)} TO ${Sql.expand(publicDbusr)};"
+				def query = "GRANT USAGE ON SCHEMA ${Sql.expand(dbschema)} TO ${Sql.expand(grantPublic)};" +
+							"GRANT SELECT ON ALL TABLES IN SCHEMA ${Sql.expand(dbschema)} TO ${Sql.expand(grantPublic)};"
 				sql.execute(query)
+				
 				sql.commit()
+				
 			} catch (SQLException e) {
 				sql.rollback()
 				log.error e.getMessage()
 				throw new SQLException(e) // catch this in main method (I guess)
 			} finally {
-				sql.connection.close() // this is executed even we throw a new exception
+				sql.connection.close() // this is really executed even we throw a new exception
 				sql.close()
 			}
 			
@@ -78,7 +80,7 @@ class PostgresqlDatabase {
 		} 
 		
 		// Add some additional attributes to the tables.
-		// E.g. fosnr and delivery date.
+		// fosnr, lot and delivery date.
 		if (addAdditionalAttributes) {
 			def sql = Sql.newInstance(dburl)
 			sql.connection.autoCommit = false
@@ -97,11 +99,16 @@ class PostgresqlDatabase {
 										"ALTER TABLE ${Sql.expand(dbschema)}.${Sql.expand(tableName)} ADD COLUMN lieferdatum date;"
 						sql.execute(alterQuery)
 						
-						log.debug "Adding additional attributes to table: ${tableName}"
-						
-						// TODO: add index for gem_bfs!!
+						def indexQuery = "CREATE INDEX idx_${Sql.expand(tableName)}_gem_bfs " +
+										"ON ${Sql.expand(dbschema)}.${Sql.expand(tableName)} USING btree(gem_bfs);"
+						sql.execute(indexQuery)
+									
+						log.trace "Adding additional attributes to table: ${tableName}"
 					}	
 				}
+				
+				sql.commit()
+			
 			} catch (SQLException e) {
 				sql.rollback()
 				log.error e.getMessage()

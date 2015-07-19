@@ -31,7 +31,9 @@ class Main {
 		cli.with {
 			_ longOpt: 'help', 'Usage Information'
 			_ longOpt: 'download', 'Download data from FTP server'
-			_ longOpt: 'initdb', 'Intitialize databasy by creating empty schema', required: false
+			_ longOpt: 'schemaimport', 'Intitialize database by creating schema with empty tables', required: false
+			_ longOpt: 'additionalattributes', 'Add fosnr, lot and delivery date to each table/record.', required: false
+			_ longOpt: 'grantpublic', 'Grant usage/select to a public user/role', args:1, argName:'role'
 		}
         		
 		def options= cli.parse(args)
@@ -39,8 +41,9 @@ class Main {
 			return
 		}
 		
-		if (options.help) {
+		if (options.help) {			
 			cli.usage()
+			return
 		}
 		
 		if (options.download) {
@@ -53,12 +56,19 @@ class Main {
 			log.debug "List of downloaded files: ${fileList}"
 		}
 		
-		if (options.initdb) {
+		if (options.schemaimport) {
 			log.info 'Create database schema.'
 			
 			def pg = new PostgresqlDatabase()
-			pg.grantSelectToPublicDbusr = true
-			pg.addAdditionalAttributes = true
+			
+			if (options.grantpublic) {
+				pg.grantPublic = options.grantpublic
+			}
+			
+			if (options.additionalattributes) {
+				pg.addAdditionalAttributes = true
+			}
+			
 			pg.createSchema()
 		}
 		
