@@ -3,6 +3,9 @@ package org.catais.av
 import groovy.util.logging.Log4j2
 import groovy.sql.Sql
 import java.sql.SQLException
+import static groovy.io.FileType.*
+import static groovy.io.FileVisitResult.*
+import org.apache.commons.io.FilenameUtils
 
 import ch.ehi.ili2db.base.Ili2db
 import ch.ehi.ili2db.gui.Config
@@ -18,44 +21,38 @@ class PostgresqlDatabase {
 	def dbpwd = "ziegler12"
 	def dbschema = "av_avdool_ng"
 	def modelName = "DM01AVCH24D"
+	def dburl = "jdbc:postgresql://${dbhost}:${dbport}/${dbdatabase}"
 	
 	def grantPublic = null
 	def addAdditionalAttributes = false
 	
+	def runImport(importDirectory) {
+		
+		def config = ili2dbConfig()
+		println config
+		
+		
+		new File(importDirectory).eachFile(FILES) {file ->
+			def fileName = file.getName()
+			def fileExtension =  FilenameUtils.getExtension(fileName)
+			
+			if (!fileExtension.equalsIgnoreCase('itf')) {
+				return
+			}
+			
+			println file
+			
+			
+			
+		}
+	}
+		
 	def createSchema() {
-		def config = new Config()
-		config.setDbhost(dbhost)
-		config.setDbdatabase(dbdatabase)
-		config.setDbport(dbport)
-		config.setDbusr(dbusr)
-		config.setDbpwd(dbpwd)
-		config.setDbschema(dbschema)
-		config.setModels(modelName);
-		config.setModeldir("http://models.geo.admin.ch/");
-		
-		config.setGeometryConverter(PostgisGeometryConverter.class.getName())
-		config.setDdlGenerator(GeneratorPostgresql.class.getName())
-		config.setJdbcDriver("org.postgresql.Driver")
-
-		config.setNameOptimization("topic")
-		config.setMaxSqlNameLength("60")
-		config.setStrokeArcs("enable")
-		config.setSqlNull("enable"); // be less restrictive
-		config.setValue("ch.ehi.sqlgen.createGeomIndex", "True");
-		
-		// TODO: Would it make sense to create an index on pk (t_id) and fk?
-		
-		config.setDefaultSrsAuthority("EPSG")
-		config.setDefaultSrsCode("21781")
-		
-		def dburl = "jdbc:postgresql://${dbhost}:${dbport}/${dbdatabase}"
-		config.setDburl(dburl)
-
+		def config = ili2dbConfig()
 		Ili2db.runSchemaImport(config, "");
-		log.info "Schema created: ${dbschema}."
 		
 		// Grant usage rights on schema and select on all tables in this schema
-		// to a read only user (which must exist in the database).
+		// to a read only user (which must exist in the database).		
 		if (grantPublic) {
 			def sql = Sql.newInstance(dburl)
 			sql.connection.autoCommit = false
@@ -76,7 +73,7 @@ class PostgresqlDatabase {
 				sql.close()
 			}
 			
-			log.info "Usage on schema and tables granted."
+			log.debug "Usage on schema and tables granted."
 		} 
 		
 		// Add some additional attributes to the tables.
@@ -118,10 +115,39 @@ class PostgresqlDatabase {
 				sql.close()
 			}
 					
-			log.info "Additional attributes added to database tables."
+			log.debug "Additional attributes added to database tables."
 		}
-		
-				
+		log.info "Schema created: ${dbschema}."		
 	}
+	
+	private def ili2dbConfig() {
+		def config = new Config()
+		config.setDbhost(dbhost)
+		config.setDbdatabase(dbdatabase)
+		config.setDbport(dbport)
+		config.setDbusr(dbusr)
+		config.setDbpwd(dbpwd)
+		config.setDbschema(dbschema)
+		config.setModels(modelName);
+		config.setModeldir("http://models.geo.admin.ch/");
+		
+		config.setGeometryConverter(PostgisGeometryConverter.class.getName())
+		config.setDdlGenerator(GeneratorPostgresql.class.getName())
+		config.setJdbcDriver("org.postgresql.Driver")
 
+		config.setNameOptimization("topic")
+		config.setMaxSqlNameLength("60")
+		config.setStrokeArcs("enable")
+		config.setSqlNull("enable"); // be less restrictive
+		config.setValue("ch.ehi.sqlgen.createGeomIndex", "True");
+		
+		// TODO: Would it make sense to create an index on pk (t_id) and fk?
+		
+		config.setDefaultSrsAuthority("EPSG")
+		config.setDefaultSrsCode("21781")
+		
+		config.setDburl(dburl)
+
+		return config
+	}
 }

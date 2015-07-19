@@ -37,7 +37,7 @@ class CataisFtp {
 					return
 				}
 			
-				log.debug "File downloaded: ${incomingFile.absoluteFile}"
+				log.trace "File downloaded: ${incomingFile.absoluteFile}"
 				fileList << incomingFile.absoluteFile
 			}
 			

@@ -10,10 +10,7 @@ class Main {
 	
 	static main(args) {
 
-		// These must be configurable.
-		def importDirectory = '/tmp/'
-		//		
-		
+		def importDirectory = '/tmp/'		
 		def fileList
 		
 		def startTime = Calendar.instance.time
@@ -31,9 +28,11 @@ class Main {
 		cli.with {
 			_ longOpt: 'help', 'Usage Information'
 			_ longOpt: 'download', 'Download data from FTP server'
-			_ longOpt: 'schemaimport', 'Intitialize database by creating schema with empty tables', required: false
+			_ longOpt: 'schemaimport', 'Prepare database by creating schema with empty tables', required: false
 			_ longOpt: 'additionalattributes', 'Add fosnr, lot and delivery date to each table/record.', required: false
 			_ longOpt: 'grantpublic', 'Grant usage/select to a public user/role', args:1, argName:'role'
+			_ longOpt: 'importdirectory', 'Directory with data to import. Will be used as download directory too.', args:1, argName:'directory'
+			_ longOpt: 'import', 'Import data into database'
 		}
         		
 		def options= cli.parse(args)
@@ -46,18 +45,30 @@ class Main {
 			return
 		}
 		
+		if (options.importdirectory) {
+			importDirectory = options.importdirectory
+		}
+		
 		if (options.download) {
-			log.info 'Download files from FTP Server.'
+			log.info 'Download files from FTP server.'
 			
-//			def ftp = new CataisFtp()
-//			ftp.downloadDirectory = importDirectory
+			def ftp = new CataisFtp()
+			ftp.downloadDirectory = importDirectory
 //			fileList = ftp.downloadData()
+			
+			// TODO: What do I do with fileList? Some QA at the end?
 		
 			log.debug "List of downloaded files: ${fileList}"
+			
+			endTime = Calendar.instance.time
+			endTimeMs = endTime.time
+			elapsedTime = (endTimeMs - startTimeMs)
+			log.info "Elapsed time: ${elapsedTime} ms"
+			log.info "All files downloaded from FTP server."			
 		}
 		
 		if (options.schemaimport) {
-			log.info 'Create database schema.'
+			log.info 'Create database schema:'
 			
 			def pg = new PostgresqlDatabase()
 			
@@ -69,10 +80,21 @@ class Main {
 				pg.addAdditionalAttributes = true
 			}
 			
-			pg.createSchema()
+//			pg.createSchema()
+			
+			endTime = Calendar.instance.time
+			endTimeMs = endTime.time
+			elapsedTime = (endTimeMs - startTimeMs)
+			log.info "Elapsed time: ${elapsedTime} ms"
+			log.info 'Database schema created.'			
 		}
 		
-		
+		if (options.import) {
+			log.info 'Import data:'
+			
+			def pg = new PostgresqlDatabase()
+			pg.runImport(importDirectory)
+		}
 		
 		
 		
@@ -80,7 +102,7 @@ class Main {
 		endTimeMs = endTime.time
 		elapsedTime = (endTimeMs - startTimeMs)
 
-		log.info "Elapsed time: ${elapsedTime} ms"
+		log.info "Total elapsed time: ${elapsedTime} ms"
 		log.info "End: ${endTime}."
 		
 		println "Stefan"
