@@ -55,17 +55,11 @@ class PostgresqlDatabase {
 			
 			log.debug "Importing: ${file.getAbsolutePath()}"
 			def startTime = Calendar.instance.timeInMillis
-	
 			
 			config.setXtffile(file.getAbsolutePath())
 			
 			try {
 				Ili2db.runImport(config, "")
-			}
-			catch (Exception e) {
-				e.printStackTrace();
-				log.error e.getMessage()
-				
 			} catch (Ili2dbException e) {
 				e.printStackTrace();
 				log.error e.getMessage()
@@ -121,7 +115,8 @@ class PostgresqlDatabase {
 					// In the table t_ili2db_classname is more than just 'all' tables. 
 					// We need to find out if an entry of t_ili2db is really a postgresql table.
 					// TODO: Ask C. Eisenhut if there is a way to get only the table names?
-					def existsQuery = "SELECT EXISTS (SELECT * FROM information_schema.tables WHERE table_schema = '${Sql.expand(dbschema)}' AND table_name = '${Sql.expand(tableName)}');"
+					def existsQuery = "SELECT EXISTS (SELECT * FROM information_schema.tables WHERE table_schema = '${Sql.expand(dbschema)}' " + 
+									"AND table_name = '${Sql.expand(tableName)}');"
 					if (sql.firstRow(existsQuery).exists) {
 						def alterQuery = "ALTER TABLE ${Sql.expand(dbschema)}.${Sql.expand(tableName)} ADD COLUMN gem_bfs integer;" +
 										"ALTER TABLE ${Sql.expand(dbschema)}.${Sql.expand(tableName)} ADD COLUMN los integer;" +
@@ -160,6 +155,8 @@ class PostgresqlDatabase {
 		config.setDbusr(dbusr)
 		config.setDbpwd(dbpwd)
 		config.setDbschema(dbschema)
+		config.setDburl(dburl)
+		
 		config.setModels(modelName);
 		config.setModeldir("http://models.geo.admin.ch/");
 		
@@ -177,8 +174,6 @@ class PostgresqlDatabase {
 		
 		config.setDefaultSrsAuthority("EPSG")
 		config.setDefaultSrsCode("21781")
-		
-		config.setDburl(dburl)
 		
 		config.setLogfile("/Users/stefan/tmp/foo.log");
 	
