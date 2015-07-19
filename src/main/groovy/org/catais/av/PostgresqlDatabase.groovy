@@ -8,6 +8,7 @@ import static groovy.io.FileVisitResult.*
 import org.apache.commons.io.FilenameUtils
 
 import ch.ehi.ili2db.base.Ili2db
+import ch.ehi.ili2db.base.Ili2dbException
 import ch.ehi.ili2db.gui.Config
 import ch.ehi.ili2pg.converter.PostgisGeometryConverter
 import ch.ehi.sqlgen.generator_impl.jdbc.GeneratorPostgresql
@@ -29,8 +30,20 @@ class PostgresqlDatabase {
 	def runImport(importDirectory) {
 		
 		def config = ili2dbConfig()
-		println config
 		
+		// This is a bit tricky:
+		// Ili2db appends data with the --import option
+		// when the tables exists. It seems that it tries
+		// to write some records into t_ili2db_settings 
+		// table which is not necessary when we do actually
+		// an appending of data. It throws an 'duplicate key'
+		// error. With .setConfigReadFromDb(true) ili2db
+		// does not try to write data into t_ili2db_settings.
+		//
+		// At the moment we need to run .schemaImport once!
+		//
+		// TODO: Ask C. Eisenhut.
+		config.setConfigReadFromDb(true)
 		
 		new File(importDirectory).eachFile(FILES) {file ->
 			def fileName = file.getName()
@@ -40,11 +53,29 @@ class PostgresqlDatabase {
 				return
 			}
 			
-			println file
+			log.debug "Importing: ${file.getAbsolutePath()}"
+			def startTime = Calendar.instance.timeInMillis
+	
 			
+			config.setXtffile(file.getAbsolutePath())
 			
+			try {
+				Ili2db.runImport(config, "")
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+				log.error e.getMessage()
+				
+			} catch (Ili2dbException e) {
+				e.printStackTrace();
+				log.error e.getMessage()
+			}
 			
+			def endTime = Calendar.instance.timeInMillis
+			def elapsedTime = (endTime - startTime) / 1000
+			log.debug "Importing done in: ${elapsedTime} s"
 		}
+		log.info "All files imported."
 	}
 		
 	def createSchema() {
@@ -89,6 +120,7 @@ class PostgresqlDatabase {
 					
 					// In the table t_ili2db_classname is more than just 'all' tables. 
 					// We need to find out if an entry of t_ili2db is really a postgresql table.
+					// TODO: Ask C. Eisenhut if there is a way to get only the table names?
 					def existsQuery = "SELECT EXISTS (SELECT * FROM information_schema.tables WHERE table_schema = '${Sql.expand(dbschema)}' AND table_name = '${Sql.expand(tableName)}');"
 					if (sql.firstRow(existsQuery).exists) {
 						def alterQuery = "ALTER TABLE ${Sql.expand(dbschema)}.${Sql.expand(tableName)} ADD COLUMN gem_bfs integer;" +
@@ -147,7 +179,9 @@ class PostgresqlDatabase {
 		config.setDefaultSrsCode("21781")
 		
 		config.setDburl(dburl)
-
+		
+		config.setLogfile("/Users/stefan/tmp/foo.log");
+	
 		return config
 	}
 }

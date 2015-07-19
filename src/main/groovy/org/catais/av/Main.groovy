@@ -94,9 +94,13 @@ class Main {
 			
 			def pg = new PostgresqlDatabase()
 			pg.runImport(importDirectory)
+			
+			endTime = Calendar.instance.time
+			endTimeMs = endTime.time
+			elapsedTime = (endTimeMs - startTimeMs)
+			log.info "Elapsed time: ${elapsedTime} ms"
+			log.info 'Importing done.'
 		}
-		
-		
 		
 		endTime = Calendar.instance.time
 		endTimeMs = endTime.time
@@ -105,8 +109,6 @@ class Main {
 		log.info "Total elapsed time: ${elapsedTime} ms"
 		log.info "End: ${endTime}."
 		
-		println "Stefan"
-		
+		println "Stefan"	
 	}
-
 }
