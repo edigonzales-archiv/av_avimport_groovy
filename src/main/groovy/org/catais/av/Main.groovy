@@ -60,9 +60,7 @@ class Main {
 		
 			log.debug "List of downloaded files: ${fileList}"
 			
-			endTime = Calendar.instance.time
-			endTimeMs = endTime.time
-			elapsedTime = (endTimeMs - startTimeMs)
+			elapsedTime = Utils.elapsedTime(startTimeMs)
 			log.info "Elapsed time: ${elapsedTime} ms"
 			log.info "All files downloaded from FTP server."			
 		}
@@ -80,11 +78,9 @@ class Main {
 				pg.addAdditionalAttributes = true
 			}
 			
-//			pg.createSchema()
+//			pg.initSchema()
 			
-			endTime = Calendar.instance.time
-			endTimeMs = endTime.time
-			elapsedTime = (endTimeMs - startTimeMs)
+			elapsedTime = Utils.elapsedTime(startTimeMs)
 			log.info "Elapsed time: ${elapsedTime} ms"
 			log.info 'Database schema created.'			
 		}
@@ -95,17 +91,12 @@ class Main {
 			def pg = new PostgresqlDatabase()
 			pg.runImport(importDirectory)
 			
-			endTime = Calendar.instance.time
-			endTimeMs = endTime.time
-			elapsedTime = (endTimeMs - startTimeMs)
+			elapsedTime = Utils.elapsedTime(startTimeMs)
 			log.info "Elapsed time: ${elapsedTime} ms"
 			log.info 'Importing done.'
 		}
 		
-		endTime = Calendar.instance.time
-		endTimeMs = endTime.time
-		elapsedTime = (endTimeMs - startTimeMs)
-
+		elapsedTime = Utils.elapsedTime(startTimeMs)
 		log.info "Total elapsed time: ${elapsedTime} ms"
 		log.info "End: ${endTime}."
 		

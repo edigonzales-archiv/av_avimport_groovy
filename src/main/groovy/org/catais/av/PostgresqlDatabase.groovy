@@ -72,7 +72,7 @@ class PostgresqlDatabase {
 		log.info "All files imported."
 	}
 		
-	def createSchema() {
+	def initSchema() {
 		def config = ili2dbConfig()
 		Ili2db.runSchemaImport(config, "");
 		
