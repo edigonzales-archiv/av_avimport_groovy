@@ -58,11 +58,25 @@ class PostgresqlDatabase {
 			
 			config.setXtffile(file.getAbsolutePath())
 			
+			def fosnr = fileName.substring(3,7) as int // Exception will be thrown and no import will be done.
+			def lot = fileName.substring(7,9) as int
+			def today = new Date().toTimestamp()
+						
 			try {
 				Ili2db.runImport(config, "")
+				
+				// When exception is throw we should abort import. There will be huge problems when we try to update
+				// these columns with the next community because we assign false fosnr etc. etc.
+				// We could try a manuel rollback...
+//				updateAdditionalColumns(fosnr, lot, today)
+	
 			} catch (Ili2dbException e) {
 				e.printStackTrace();
 				log.error e.getMessage()
+			} catch (Exception e) {
+				e.printStackTrace();
+				log.error e.getMessage()
+				throw new Exception(e)
 			}
 			
 			def endTime = Calendar.instance.timeInMillis
@@ -71,6 +85,44 @@ class PostgresqlDatabase {
 		}
 		log.info "All files imported."
 	}
+	
+	def updateAdditionalColumns(fosnr, lot, today) {
+		
+		def sql = Sql.newInstance(dburl)
+		sql.connection.autoCommit = false
+		
+		try {
+			def query = "SELECT * FROM ${Sql.expand(dbschema)}.t_ili2db_classname;"
+			sql.eachRow(query) {row ->
+				def tableName = row.sqlname.toLowerCase()
+				
+				def existsQuery = "SELECT EXISTS (SELECT * FROM information_schema.tables WHERE table_schema = '${Sql.expand(dbschema)}' " +
+								"AND table_name = '${Sql.expand(tableName)}');"
+				if (sql.firstRow(existsQuery).exists) {
+					
+					def updateFosNrQuery = "UPDATE ${Sql.expand(dbschema)}.${Sql.expand(tableName)} " + 
+									"SET (gem_bfs, los, lieferdatum) = (${fosnr}, ${lot}, ${today}) " + 
+									"WHERE gem_bfs IS NULL;"
+					
+					sql.execute(updateFosNrQuery)
+					log.trace "Adding additional attributes from table '${tableName}' are updated."
+					
+				}	
+			}
+			
+			sql.commit()
+		
+		} catch (SQLException e) {
+			sql.rollback()
+			log.error e.getMessage()
+			throw new SQLException(e)
+		} finally {
+			sql.connection.close()
+			sql.close()
+		}
+
+	}
+	
 		
 	def initSchema() {
 		def config = ili2dbConfig()
@@ -169,6 +221,7 @@ class PostgresqlDatabase {
 		config.setStrokeArcs("enable")
 		config.setSqlNull("enable"); // be less restrictive
 		config.setValue("ch.ehi.sqlgen.createGeomIndex", "True");
+		config.setCreateEnumCols("addTxtCol")
 		
 		// TODO: Would it make sense to create an index on pk (t_id) and fk?
 		

@@ -23,7 +23,7 @@ class Main {
 		log.info "Start: ${startTime}."
 	
 		def cli = new CliBuilder(
-			usage: 'groovy Fubar.groovy --initdb', 
+			usage: 'av_avimport', 
 			header: '\nAvailable options (use --help for help):\n') 	 
 		cli.with {
 			_ longOpt: 'help', 'Usage Information'
@@ -78,7 +78,7 @@ class Main {
 				pg.addAdditionalAttributes = true
 			}
 			
-//			pg.initSchema()
+			pg.initSchema()
 			
 			elapsedTime = Utils.elapsedTime(startTimeMs)
 			log.info "Elapsed time: ${elapsedTime} ms"
@@ -96,6 +96,7 @@ class Main {
 			log.info 'Importing done.'
 		}
 		
+		endTime = Calendar.instance.time
 		elapsedTime = Utils.elapsedTime(startTimeMs)
 		log.info "Total elapsed time: ${elapsedTime} ms"
 		log.info "End: ${endTime}."
