@@ -13,6 +13,13 @@ import ch.ehi.ili2db.gui.Config
 import ch.ehi.ili2pg.converter.PostgisGeometryConverter
 import ch.ehi.sqlgen.generator_impl.jdbc.GeneratorPostgresql
 
+// TODO: Write a method that returns all "real" tables. 
+// We need this several times. And I think even for
+// a manual rollback of an import. Easy when we have
+// additional attributes: delete everythin where 
+// "gem_bfs" IS NULL.
+// Returning a list is enough?
+
 @Log4j2
 class PostgresqlDatabase {
 	def dbhost = "localhost"
@@ -20,7 +27,7 @@ class PostgresqlDatabase {
 	def dbdatabase = "xanadu2"
 	def dbusr = "stefan"
 	def dbpwd = "ziegler12"
-	def dbschema = "av_avdool_ng"
+	def dbschema = "av_avdpool_ng"
 	def modelName = "DM01AVCH24D"
 	def dburl = "jdbc:postgresql://${dbhost}:${dbport}/${dbdatabase}"
 	
@@ -37,10 +44,11 @@ class PostgresqlDatabase {
 		// to write some records into t_ili2db_settings 
 		// table which is not necessary when we do actually
 		// an appending of data. It throws an 'duplicate key'
-		// error. With .setConfigReadFromDb(true) ili2db
+		// error. Solution: with .setConfigReadFromDb(true) ili2db
 		// does not try to write data into t_ili2db_settings.
 		//
-		// At the moment we need to run .schemaImport once!
+		// But: at the moment we need to run at least .schemaImport() once
+		// prior importing data.
 		//
 		// TODO: Ask C. Eisenhut.
 		config.setConfigReadFromDb(true)
@@ -60,16 +68,18 @@ class PostgresqlDatabase {
 			
 			def fosnr = fileName.substring(3,7) as int // Exception will be thrown and no import will be done.
 			def lot = fileName.substring(7,9) as int
-			def today = new Date().toTimestamp()
+			def today = new Date().toTimestamp() // Convert java.util.Date to java.sql.Date
 						
 			try {
 				Ili2db.runImport(config, "")
 				
-				// When exception is throw we should abort import. There will be huge problems when we try to update
-				// these columns with the next community because we assign false fosnr etc. etc.
-				// We could try a manuel rollback...
-//				updateAdditionalColumns(fosnr, lot, today)
-	
+				// When an exception is thrown we should abort the import. 
+				// There will be huge problems when we try to update
+				// these columns with the next ITF because we assign false fosnr etc. etc.
+				// We could try a manual rollback...
+				if (addAdditionalAttributes) {
+					updateAdditionalColumns(fosnr, lot, today)
+				}
 			} catch (Ili2dbException e) {
 				e.printStackTrace();
 				log.error e.getMessage()
@@ -79,39 +89,33 @@ class PostgresqlDatabase {
 				throw new Exception(e)
 			}
 			
-			def endTime = Calendar.instance.timeInMillis
-			def elapsedTime = (endTime - startTime) / 1000
+			def elapsedTime = (Calendar.instance.timeInMillis - startTime) / 1000
 			log.debug "Importing done in: ${elapsedTime} s"
 		}
-		log.info "All files imported."
+		log.debug "All files imported."
 	}
 	
-	def updateAdditionalColumns(fosnr, lot, today) {
-		
+	private def updateAdditionalColumns(fosnr, lot, today) {
 		def sql = Sql.newInstance(dburl)
 		sql.connection.autoCommit = false
-		
+					
 		try {
 			def query = "SELECT * FROM ${Sql.expand(dbschema)}.t_ili2db_classname;"
 			sql.eachRow(query) {row ->
 				def tableName = row.sqlname.toLowerCase()
-				
+								
 				def existsQuery = "SELECT EXISTS (SELECT * FROM information_schema.tables WHERE table_schema = '${Sql.expand(dbschema)}' " +
 								"AND table_name = '${Sql.expand(tableName)}');"
 				if (sql.firstRow(existsQuery).exists) {
-					
 					def updateFosNrQuery = "UPDATE ${Sql.expand(dbschema)}.${Sql.expand(tableName)} " + 
 									"SET (gem_bfs, los, lieferdatum) = (${fosnr}, ${lot}, ${today}) " + 
 									"WHERE gem_bfs IS NULL;"
-					
 					sql.execute(updateFosNrQuery)
-					log.trace "Adding additional attributes from table '${tableName}' are updated."
 					
+					log.trace "Adding additional attributes from table '${tableName}' are updated."
 				}	
 			}
-			
 			sql.commit()
-		
 		} catch (SQLException e) {
 			sql.rollback()
 			log.error e.getMessage()
@@ -120,10 +124,8 @@ class PostgresqlDatabase {
 			sql.connection.close()
 			sql.close()
 		}
-
 	}
 	
-		
 	def initSchema() {
 		def config = ili2dbConfig()
 		Ili2db.runSchemaImport(config, "");
@@ -138,9 +140,7 @@ class PostgresqlDatabase {
 				def query = "GRANT USAGE ON SCHEMA ${Sql.expand(dbschema)} TO ${Sql.expand(grantPublic)};" +
 							"GRANT SELECT ON ALL TABLES IN SCHEMA ${Sql.expand(dbschema)} TO ${Sql.expand(grantPublic)};"
 				sql.execute(query)
-				
 				sql.commit()
-				
 			} catch (SQLException e) {
 				sql.rollback()
 				log.error e.getMessage()
@@ -149,12 +149,13 @@ class PostgresqlDatabase {
 				sql.connection.close() // this is really executed even we throw a new exception
 				sql.close()
 			}
-			
 			log.debug "Usage on schema and tables granted."
 		} 
 		
-		// Add some additional attributes to the tables.
-		// fosnr, lot and delivery date.
+		// Add some additional attributes to the tables:
+		// "gem_bfs" -> fosnr
+		// "los" -> lot
+		// "lieferdatum -> delivery date
 		if (addAdditionalAttributes) {
 			def sql = Sql.newInstance(dburl)
 			sql.connection.autoCommit = false
@@ -164,7 +165,7 @@ class PostgresqlDatabase {
 				sql.eachRow(query) {row ->
 					def tableName = row.sqlname.toLowerCase() 					
 					
-					// In the table t_ili2db_classname is more than just 'all' tables. 
+					// There is more in the table t_ili2db_classname than just 'all' tables. 
 					// We need to find out if an entry of t_ili2db is really a postgresql table.
 					// TODO: Ask C. Eisenhut if there is a way to get only the table names?
 					def existsQuery = "SELECT EXISTS (SELECT * FROM information_schema.tables WHERE table_schema = '${Sql.expand(dbschema)}' " + 
@@ -174,17 +175,15 @@ class PostgresqlDatabase {
 										"ALTER TABLE ${Sql.expand(dbschema)}.${Sql.expand(tableName)} ADD COLUMN los integer;" +
 										"ALTER TABLE ${Sql.expand(dbschema)}.${Sql.expand(tableName)} ADD COLUMN lieferdatum date;"
 						sql.execute(alterQuery)
-						
+
 						def indexQuery = "CREATE INDEX idx_${Sql.expand(tableName)}_gem_bfs " +
 										"ON ${Sql.expand(dbschema)}.${Sql.expand(tableName)} USING btree(gem_bfs);"
 						sql.execute(indexQuery)
-									
+							
 						log.trace "Adding additional attributes to table: ${tableName}"
 					}	
 				}
-				
 				sql.commit()
-			
 			} catch (SQLException e) {
 				sql.rollback()
 				log.error e.getMessage()
@@ -193,10 +192,9 @@ class PostgresqlDatabase {
 				sql.connection.close()
 				sql.close()
 			}
-					
 			log.debug "Additional attributes added to database tables."
 		}
-		log.info "Schema created: ${dbschema}."		
+		log.debug "Schema created: ${dbschema}."		
 	}
 	
 	private def ili2dbConfig() {
@@ -224,11 +222,16 @@ class PostgresqlDatabase {
 		config.setCreateEnumCols("addTxtCol")
 		
 		// TODO: Would it make sense to create an index on pk (t_id) and fk?
+		// Ask C. Eisenhut.
 		
 		config.setDefaultSrsAuthority("EPSG")
 		config.setDefaultSrsCode("21781")
 		
-		config.setLogfile("/Users/stefan/tmp/foo.log");
+		// Does not work. Do we want to have this working?
+		// We write logfile of our own. I think there is no
+		// easy way to have only one logfile?
+		// TODO: Try to use ehi logger. Ask C. Eisenhut.
+		config.setLogfile("/Users/stefan/tmp/foo.log"); 
 	
 		return config
 	}
