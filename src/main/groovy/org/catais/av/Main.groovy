@@ -42,7 +42,8 @@ class Main {
 			cli.usage()
 			return
 		}
-									
+		
+		// Start logging here.							
 		def startTime = Calendar.instance.time
 		def endTime
 		log.info "Start: ${startTime}."
