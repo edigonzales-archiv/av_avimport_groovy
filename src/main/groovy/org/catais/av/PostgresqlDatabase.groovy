@@ -33,7 +33,7 @@ class PostgresqlDatabase {
 	
 	def grantPublic = null
 	def addAdditionalAttributes = false
-	
+		
 	def runImport(importDirectory) {
 		
 		def config = ili2dbConfig()
