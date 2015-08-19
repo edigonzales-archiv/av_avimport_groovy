@@ -7,6 +7,7 @@ import static groovy.io.FileType.*
 import static groovy.io.FileVisitResult.*
 import org.apache.commons.io.FilenameUtils
 
+import ch.ehi.basics.logging.EhiLogger
 import ch.ehi.ili2db.base.Ili2db
 import ch.ehi.ili2db.base.Ili2dbException
 import ch.ehi.ili2db.gui.Config
@@ -29,12 +30,16 @@ class PostgresqlDatabase {
 	def dbpwd = "ziegler12"
 	def dbschema = "av_avdpool_ng"
 	def modelName = "DM01AVCH24D"
-	def dburl = "jdbc:postgresql://${dbhost}:${dbport}/${dbdatabase}"
+	
+	// It worked on OS X w/o user and password. But there's a mess with the roles.
+	// Ili2pg shows dburl so we should create another one for the groovy stuff.
+	def dburl = "jdbc:postgresql://${dbhost}:${dbport}/${dbdatabase}?user=${dbusr}&password=${dbpwd}" 
 	
 	def grantPublic = null
 	def addAdditionalAttributes = false
 		
 	def runImport(importDirectory) {
+		EhiLogger.getInstance().setTraceFilter(false);
 		
 		def config = ili2dbConfig()
 		
@@ -216,7 +221,7 @@ class PostgresqlDatabase {
 
 		config.setNameOptimization("topic")
 		config.setMaxSqlNameLength("60")
-		config.setStrokeArcs("enable")
+//		config.setStrokeArcs("enable")
 		config.setSqlNull("enable"); // be less restrictive
 		config.setValue("ch.ehi.sqlgen.createGeomIndex", "True");
 		config.setCreateEnumCols("addTxtCol")
@@ -231,7 +236,7 @@ class PostgresqlDatabase {
 		// We write logfile of our own. I think there is no
 		// easy way to have only one logfile?
 		// TODO: Try to use ehi logger. Ask C. Eisenhut.
-		config.setLogfile("/Users/stefan/tmp/foo.log"); 
+		config.setLogfile("/home/stefan/tmp/foo.log"); 
 	
 		return config
 	}
