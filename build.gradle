@@ -17,8 +17,8 @@ dependencies {
     compile 'commons-net:commons-net:3.3'
     compile 'commons-io:commons-io:2.4'
     compile 'org.postgresql:postgresql:9.4-1201-jdbc41'
-    compile 'ch.interlis:ili2c:4.5.12'
-    compile 'ch.interlis:ili2pg:2.1.4'
+    compile 'ch.interlis:ili2c:4.5.17'
+    compile 'ch.interlis:ili2pg:2.2.0'
 
     // We use the awesome Spock testing and specification framework
     testCompile 'org.spockframework:spock-core:1.0-groovy-2.4'
