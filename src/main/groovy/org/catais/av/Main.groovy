@@ -1,9 +1,6 @@
 package org.catais.av
 
 import groovy.util.logging.Log4j2
-
-import java.security.cert.PKIXRevocationChecker.Option;
-
 import groovy.util.CliBuilder
 
 @Log4j2
