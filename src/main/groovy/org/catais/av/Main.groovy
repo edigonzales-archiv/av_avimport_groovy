@@ -76,7 +76,7 @@ class Main {
 			
 			endTime = Calendar.instance.time
 			log.debug "Elapsed time: ${(endTime.time - startTime.time)} ms."
-			log.info 'Database schema created.'			
+			log.info 'Database schema created.'						
 		}
 		
 		if (options.import) {

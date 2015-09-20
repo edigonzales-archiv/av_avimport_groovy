@@ -1,0 +1,1 @@
+./import.sh >> ili2pg_stdout.log 2>&1 

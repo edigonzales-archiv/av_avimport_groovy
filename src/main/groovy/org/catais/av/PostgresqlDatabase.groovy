@@ -28,7 +28,7 @@ class PostgresqlDatabase {
 	def dbdatabase = "xanadu2"
 	def dbusr = "stefan"
 	def dbpwd = "ziegler12"
-	def dbschema = "av_avdpool_ng"
+	def dbschema = "av_avdpool_ng_arcs"
 	def modelName = "DM01AVCH24D"
 	
 	// It worked on OS X w/o user and password. But there's a mess with the roles.
@@ -45,20 +45,18 @@ class PostgresqlDatabase {
 		
 		// This is a bit tricky:
 		// Ili2db appends data with the --import option
-		// when the tables exists. It seems that it tries
-		// to write some records into t_ili2db_settings 
-		// table which is not necessary when we do actually
-		// an appending of data. It throws an 'duplicate key'
-		// error. Solution: with .setConfigReadFromDb(true) ili2db
-		// does not try to write data into t_ili2db_settings.
-		//
-		// But: at the moment we need to run at least .schemaImport() once
-		// prior importing data.
-		//
-		// TODO: Ask C. Eisenhut.
+		// when the tables exists. This behaviour corresponds
+		// with 'appending data'. Using the classes here 
+		// in our own java code we need to set 
+		// config.setConfigReadFromDb(true). Without this
+		// ilidb tries to insert some meta data into
+		// some tables but fails because of primary keys
+		// constraints.
 		config.setConfigReadFromDb(true)
 		
-		new File(importDirectory).eachFile(FILES) {file ->
+//		new File(importDirectory).eachFile(FILES) {file ->
+		
+		new File(importDirectory).listFiles().sort{ it.name}.each() {file ->
 			def fileName = file.getName()
 			def fileExtension =  FilenameUtils.getExtension(fileName)
 			
@@ -67,6 +65,7 @@ class PostgresqlDatabase {
 			}
 			
 			log.debug "Importing: ${file.getAbsolutePath()}"
+						
 			def startTime = Calendar.instance.timeInMillis
 			
 			config.setXtffile(file.getAbsolutePath())
@@ -74,14 +73,18 @@ class PostgresqlDatabase {
 			def fosnr = fileName.substring(3,7) as int // Exception will be thrown and no import will be done.
 			def lot = fileName.substring(7,9) as int
 			def today = new Date().toTimestamp() // Convert java.util.Date to java.sql.Date
+			
+			config.setLogfile("/home/stefan/tmp/ili2pg/${fosnr}_${lot}.log");
 						
 			try {
 				Ili2db.runImport(config, "")
 				
 				// When an exception is thrown we should abort the import. 
 				// There will be huge problems when we try to update
-				// these columns with the next ITF because we assign false fosnr etc. etc.
-				// We could try a manual rollback...
+				// these columns with the next ITF because we assign a false fosnr etc. etc.
+				// We could try a manual rollback though...
+				
+				// TODO: Check if exception throwing is enterprise ready :-)
 				if (addAdditionalAttributes) {
 					updateAdditionalColumns(fosnr, lot, today)
 				}
@@ -91,7 +94,7 @@ class PostgresqlDatabase {
 			} catch (Exception e) {
 				e.printStackTrace();
 				log.error e.getMessage()
-				throw new Exception(e)
+//				throw new Exception(e)
 			}
 			
 			def elapsedTime = (Calendar.instance.timeInMillis - startTime) / 1000
@@ -151,7 +154,7 @@ class PostgresqlDatabase {
 				log.error e.getMessage()
 				throw new SQLException(e) // catch this in main method (I guess)
 			} finally {
-				sql.connection.close() // this is really executed even we throw a new exception
+				sql.connection.close()  
 				sql.close()
 			}
 			log.debug "Usage on schema and tables granted."
@@ -222,13 +225,11 @@ class PostgresqlDatabase {
 		config.setNameOptimization("topic")
 		config.setMaxSqlNameLength("60")
 //		config.setStrokeArcs("enable")
-		config.setSqlNull("enable"); // be less restrictive
+						
+		config.setSqlNull("enable") // be less restrictive
 		config.setValue("ch.ehi.sqlgen.createGeomIndex", "True");
 		config.setCreateEnumCols("addTxtCol")
-		
-		// TODO: Would it make sense to create an index on pk (t_id) and fk?
-		// Ask C. Eisenhut.
-		
+				
 		config.setDefaultSrsAuthority("EPSG")
 		config.setDefaultSrsCode("21781")
 		
@@ -236,7 +237,7 @@ class PostgresqlDatabase {
 		// We write logfile of our own. I think there is no
 		// easy way to have only one logfile?
 		// TODO: Try to use ehi logger. Ask C. Eisenhut.
-		config.setLogfile("/home/stefan/tmp/foo.log"); 
+		EhiLogger.getInstance().setTraceFilter(false);
 	
 		return config
 	}
